@@ -1,10 +1,10 @@
 {
-  "name": "professional-tts-bot",
+  "name": "pro-tts-bot",
   "version": "1.0.0",
   "main": "api/index.js",
   "dependencies": {
     "telegraf": "^4.16.3",
-    "edge-tts": "latest"
+    "edge-tts": "0.0.5"
   },
   "engines": {
     "node": "20.x"
