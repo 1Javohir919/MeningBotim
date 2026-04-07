@@ -9,10 +9,10 @@ const tts = new MsEdgeTTS();
 const CHANNEL_ID = '@TechHub201';
 const CREATOR = '@HTML5_5';
 
-// Vaqtincha saqlash
+// Xotira (Vaqtinchalik)
 const userContext = new Map();
 
-// Obunani tekshirish
+// Majburiy obuna tekshiruvi
 async function checkSub(ctx, next) {
     if (ctx.from.username === 'HTML5_5') return next();
     try {
@@ -30,40 +30,58 @@ async function checkSub(ctx, next) {
 }
 
 bot.start((ctx) => {
-    ctx.replyWithHTML(`<b>Salom, ${ctx.from.first_name}!</b>\nMatn yuboring, men uni realistik ovozga aylantiraman.\n\n👨‍💻 @HTML5_5`);
+    ctx.replyWithHTML(
+        `<b>Assalomu alaykum, ${ctx.from.first_name}!</b>\n\n` +
+        `🎙 Men matnlarni o'ta realistik ovozga aylantiraman.\n` +
+        `✍️ Matn yuboring va ovozni tanlang.\n\n` +
+        `👨‍💻 <b>Dasturchi:</b> ${CREATOR}`
+    );
 });
 
 bot.on('text', checkSub, async (ctx) => {
     if (ctx.message.text.startsWith('/')) return;
     
     userContext.set(ctx.from.id, ctx.message.text);
-    await ctx.replyWithHTML("<b>Ovoz turini tanlang:</b>", 
+    await ctx.replyWithHTML("<b>Qaysi ovozda eshitishni xohlaysiz?</b>", 
         Markup.inlineKeyboard([
-            [Markup.button.callback("👨 Sardor (Erkak)", "m"), Markup.button.callback("👩 Madina (Ayol)", "f")]
+            [
+                Markup.button.callback("👨 Sardor (Erkak)", "m"), 
+                Markup.button.callback("👩 Madina (Ayol)", "f")
+            ]
         ])
     );
 });
 
 bot.action(['m', 'f'], async (ctx) => {
-    const text = userContext.get(ctx.from.id);
-    if (!text) return ctx.answerCbQuery("Matn topilmadi!");
+    const userId = ctx.from.id;
+    const text = userContext.get(userId);
+    
+    if (!text) return ctx.answerCbQuery("⚠️ Matn topilmadi, qaytadan yuboring.", { show_alert: true });
 
     const voice = ctx.callbackQuery.data === 'm' ? 'uz-UZ-SardorNeural' : 'uz-UZ-MadinaNeural';
-    await ctx.answerCbQuery("🎙 Tayyorlanmoqda...");
-    await ctx.editMessageText("⏳ Ovoz yozilmoqda...");
+    const name = ctx.callbackQuery.data === 'm' ? 'Sardor' : 'Madina';
 
-    const tempFile = path.join('/tmp', `tts_${ctx.from.id}.mp3`);
+    await ctx.answerCbQuery(`🎙 ${name} ovozi...`);
+    await ctx.editMessageText(`⌛ <b>${name}</b> ovozida tayyorlanmoqda...`, { parse_mode: 'HTML' });
+
+    const tempFile = path.join('/tmp', `tts_${userId}_${Date.now()}.mp3`);
 
     try {
         await tts.setMetadata(voice, 'output_format');
         await tts.toFile(tempFile, text);
-        await ctx.sendVoice({ source: tempFile });
+
+        await ctx.sendVoice({ 
+            source: tempFile,
+            caption: `🎙 <b>Ovoz:</b> ${name}\n👨‍💻 <b>Dasturchi:</b> ${CREATOR}`,
+            parse_mode: 'HTML'
+        });
+
         await ctx.deleteMessage();
+        userContext.delete(userId);
     } catch (err) {
-        ctx.reply("❌ Xatolik yuz berdi.");
+        ctx.reply("❌ Xatolik yuz berdi. Matnni qisqartirib ko'ring.");
     } finally {
         if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
-        userContext.delete(ctx.from.id);
     }
 });
 
@@ -71,10 +89,12 @@ bot.action('verify', (ctx) => ctx.answerCbQuery("Endi matn yuboring!"));
 
 module.exports = async (req, res) => {
     if (req.method === 'POST') {
-        await bot.handleUpdate(req.body);
-        res.status(200).send('OK');
+        try {
+            await bot.handleUpdate(req.body);
+            res.status(200).send('OK');
+        } catch (e) { res.status(500).send('Error'); }
     } else {
-        res.status(200).send('Bot Active');
+        res.status(200).send('Professional TTS Bot is Active');
     }
 };
-                 
+                    
