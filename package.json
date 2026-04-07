@@ -1,11 +1,11 @@
 {
   "name": "professional-tts-bot",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "Realistik Erkak va Ayol ovozli TTS bot",
   "main": "api/index.js",
   "dependencies": {
     "telegraf": "^4.16.3",
-    "edge-tts": "^0.0.5"
+    "edge-tts": "latest"
   },
   "engines": {
     "node": "24.x"
