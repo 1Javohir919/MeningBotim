@@ -1,14 +1,11 @@
 {
-  "name": "telegram-giveaway-bot",
-  "version": "1.0.0",
-  "description": "Vercel va Supabase asosida ishlaydigan Giveaway Bot",
+  "name": "professional-tts-bot",
+  "version": "2.5.0",
+  "description": "Realistik Erkak va Ayol ovozli TTS bot",
   "main": "api/index.js",
-  "scripts": {
-    "start": "node api/index.js"
-  },
   "dependencies": {
     "telegraf": "^4.16.3",
-    "@supabase/supabase-js": "^2.42.0"
+    "edge-tts": "^0.0.5"
   },
   "engines": {
     "node": "24.x"
