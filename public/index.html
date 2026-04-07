@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Giveaway Panel</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --neon: #00f2fe; --bg: #0f172a; }
+        body { margin: 0; background: var(--bg); color: white; font-family: sans-serif; padding: 20px; text-align: center; }
+        .card { background: rgba(255,255,255,0.05); border-radius: 20px; padding: 25px; border: 1px solid rgba(255,255,255,0.1); }
+        .winner-box { font-size: 24px; font-weight: bold; color: var(--neon); margin: 20px 0; padding: 20px; border: 2px dashed var(--neon); border-radius: 15px; display: none; }
+        .btn { background: linear-gradient(45deg, #00f2fe, #4facfe); border: none; padding: 15px 30px; border-radius: 12px; color: white; font-weight: bold; cursor: pointer; width: 100%; font-size: 18px; }
+        .stats { margin-top: 15px; color: #94a3b8; font-size: 14px; }
+        ul { list-style: none; padding: 0; text-align: left; max-height: 200px; overflow-y: auto; }
+        li { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>📊 Giveaway Admin</h2>
+        <div class="stats" id="count">Qatnashchilar: yuklanmoqda...</div>
+        
+        <div id="winnerDisplay" class="winner-box"></div>
+
+        <button class="btn" onclick="pickWinner()">🎉 G'OLIBNI ANIQLASH</button>
+
+        <h3 style="margin-top:30px">Ro'yxat:</h3>
+        <ul id="userList"></ul>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        const supabase = supabase.createClient(
+            'https://xgqctjchppduhbickbmd.supabase.co', 
+            'sb_publishable_E2zmVN0qXUHAovMaet8nog_8-IwSm-V'
+        );
+
+        async function loadData() {
+            const { data } = await supabase.from('participants').select('*');
+            document.getElementById('count').innerText = `Jami qatnashchilar: ${data.length} ta`;
+            const list = document.getElementById('userList');
+            list.innerHTML = data.map(u => `<li>@${u.username} (${u.first_name})</li>`).join('');
+            return data;
+        }
+
+        async function pickWinner() {
+            const users = await loadData();
+            if (users.length === 0) return alert("Qatnashchilar yo'q!");
+
+            document.getElementById('winnerDisplay').style.display = 'block';
+            document.getElementById('winnerDisplay').innerText = "O'ylanmoqda...";
+
+            setTimeout(() => {
+                const winner = users[Math.floor(Math.random() * users.length)];
+                document.getElementById('winnerDisplay').innerHTML = `G'OLIB: <br> @${winner.username} <br> ID: ${winner.telegram_id}`;
+                tg.HapticFeedback.notificationOccurred('success');
+            }, 2000);
+        }
+
+        loadData();
+    </script>
+</body>
+</html>
