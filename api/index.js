@@ -4,97 +4,68 @@ const fs = require('fs');
 const path = require('path');
 
 const bot = new Telegraf('8190224846:AAF7ERKX91241pUyVDWCZzHVr1UiqfsPIXc');
-const tts = new MsEdgeTTS();
-
 const CHANNEL_ID = '@TechHub201';
 const CREATOR = '@HTML5_5';
 
-// Xotira (Vaqtinchalik)
+// Vaqtinchalik xotira
 const userContext = new Map();
 
-// Majburiy obuna tekshiruvi
-async function checkSub(ctx, next) {
-    if (ctx.from.username === 'HTML5_5') return next();
-    try {
-        const member = await ctx.telegram.getChatMember(CHANNEL_ID, ctx.from.id);
-        if (['member', 'administrator', 'creator'].includes(member.status)) return next();
-        
-        return ctx.replyWithHTML(
-            `<b>Botdan foydalanish uchun kanalga a'zo bo'ling!</b>`,
-            Markup.inlineKeyboard([
-                [Markup.button.url("📢 Kanalga a'zo bo'lish", `https://t.me/${CHANNEL_ID.replace('@','')}`)],
-                [Markup.button.callback("✅ Tekshirish", "verify")]
-            ])
-        );
-    } catch (e) { return next(); }
-}
-
 bot.start((ctx) => {
-    ctx.replyWithHTML(
-        `<b>Assalomu alaykum, ${ctx.from.first_name}!</b>\n\n` +
-        `🎙 Men matnlarni o'ta realistik ovozga aylantiraman.\n` +
-        `✍️ Matn yuboring va ovozni tanlang.\n\n` +
-        `👨‍💻 <b>Dasturchi:</b> ${CREATOR}`
-    );
+    ctx.replyWithHTML(`<b>Salom!</b> Matn yuboring va ovozni tanlang.\n\n👨‍💻 @HTML5_5`);
 });
 
-bot.on('text', checkSub, async (ctx) => {
+bot.on('text', async (ctx) => {
     if (ctx.message.text.startsWith('/')) return;
     
+    // Matnni eslab qolamiz
     userContext.set(ctx.from.id, ctx.message.text);
-    await ctx.replyWithHTML("<b>Qaysi ovozda eshitishni xohlaysiz?</b>", 
+    
+    await ctx.replyWithHTML("<b>Ovozni tanlang:</b>", 
         Markup.inlineKeyboard([
-            [
-                Markup.button.callback("👨 Sardor (Erkak)", "m"), 
-                Markup.button.callback("👩 Madina (Ayol)", "f")
-            ]
+            [Markup.button.callback("👨 Sardor", "m"), Markup.button.callback("👩 Madina", "f")]
         ])
     );
 });
 
 bot.action(['m', 'f'], async (ctx) => {
-    const userId = ctx.from.id;
-    const text = userContext.get(userId);
-    
-    if (!text) return ctx.answerCbQuery("⚠️ Matn topilmadi, qaytadan yuboring.", { show_alert: true });
+    const text = userContext.get(ctx.from.id);
+    if (!text) return ctx.answerCbQuery("Matn topilmadi, qayta yuboring!");
 
     const voice = ctx.callbackQuery.data === 'm' ? 'uz-UZ-SardorNeural' : 'uz-UZ-MadinaNeural';
-    const name = ctx.callbackQuery.data === 'm' ? 'Sardor' : 'Madina';
-
-    await ctx.answerCbQuery(`🎙 ${name} ovozi...`);
-    await ctx.editMessageText(`⌛ <b>${name}</b> ovozida tayyorlanmoqda...`, { parse_mode: 'HTML' });
-
-    const tempFile = path.join('/tmp', `tts_${userId}_${Date.now()}.mp3`);
+    const tempFile = path.join('/tmp', `tts_${Date.now()}.mp3`);
 
     try {
+        await ctx.answerCbQuery("🎙 Tayyorlanmoqda...");
+        const tts = new MsEdgeTTS();
         await tts.setMetadata(voice, 'output_format');
+        
+        // Ovoz yaratish
         await tts.toFile(tempFile, text);
-
-        await ctx.sendVoice({ 
-            source: tempFile,
-            caption: `🎙 <b>Ovoz:</b> ${name}\n👨‍💻 <b>Dasturchi:</b> ${CREATOR}`,
-            parse_mode: 'HTML'
+        
+        // Audio yuborish
+        await ctx.replyWithVoice({ source: tempFile }, {
+            caption: `🎙 @HTML5_5 tomonidan tayyorlandi`
         });
-
-        await ctx.deleteMessage();
-        userContext.delete(userId);
-    } catch (err) {
-        ctx.reply("❌ Xatolik yuz berdi. Matnni qisqartirib ko'ring.");
-    } finally {
+        
+        // Tozalash
         if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+        userContext.delete(ctx.from.id);
+    } catch (err) {
+        console.error(err);
+        ctx.reply("❌ Xatolik yuz berdi. Matn juda uzun bo'lishi mumkin.");
     }
 });
 
-bot.action('verify', (ctx) => ctx.answerCbQuery("Endi matn yuboring!"));
-
+// Vercel uchun eksport
 module.exports = async (req, res) => {
-    if (req.method === 'POST') {
-        try {
+    try {
+        if (req.method === 'POST') {
             await bot.handleUpdate(req.body);
-            res.status(200).send('OK');
-        } catch (e) { res.status(500).send('Error'); }
-    } else {
-        res.status(200).send('Professional TTS Bot is Active');
+        }
+        res.status(200).send('OK');
+    } catch (e) {
+        console.error(e);
+        res.status(200).send('OK'); // Vercel 500 bermasligi uchun doim 200 qaytaramiz
     }
 };
-                    
+                
