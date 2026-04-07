@@ -1,151 +1,80 @@
 const { Telegraf, Markup } = require('telegraf');
 const { MsEdgeTTS } = require('edge-tts');
 const fs = require('fs');
+const path = require('path');
 
-// --- KONFIGURATSIYA ---
-const BOT_TOKEN = '8190224846:AAF7ERKX91241pUyVDWCZzHVr1UiqfsPIXc';
+const bot = new Telegraf('8190224846:AAF7ERKX91241pUyVDWCZzHVr1UiqfsPIXc');
+const tts = new MsEdgeTTS();
+
 const CHANNEL_ID = '@TechHub201';
 const CREATOR = '@HTML5_5';
 
-const bot = new Telegraf(BOT_TOKEN);
-const tts = new MsEdgeTTS();
-
+// Vaqtincha saqlash
 const userContext = new Map();
 
-/**
- * MAJBURIY OBUNA TEKSHIRUVCHI
- */
+// Obunani tekshirish
 async function checkSub(ctx, next) {
+    if (ctx.from.username === 'HTML5_5') return next();
     try {
         const member = await ctx.telegram.getChatMember(CHANNEL_ID, ctx.from.id);
-        const allowed = ['member', 'administrator', 'creator'];
-
-        if (allowed.includes(member.status)) {
-            return next();
-        }
-
+        if (['member', 'administrator', 'creator'].includes(member.status)) return next();
+        
         return ctx.replyWithHTML(
-            `<b>Botdan foydalanish uchun kanalga obuna bo‘ling!</b>`,
+            `<b>Botdan foydalanish uchun kanalga a'zo bo'ling!</b>`,
             Markup.inlineKeyboard([
-                [Markup.button.url("📢 Obuna bo‘lish", `https://t.me/${CHANNEL_ID.replace('@','')}`)],
-                [Markup.button.callback("✅ Tekshirish", "verify_sub")]
+                [Markup.button.url("📢 Kanalga a'zo bo'lish", `https://t.me/${CHANNEL_ID.replace('@','')}`)],
+                [Markup.button.callback("✅ Tekshirish", "verify")]
             ])
         );
-    } catch (e) {
-        console.log("Sub error:", e);
-        return next();
-    }
+    } catch (e) { return next(); }
 }
 
-/**
- * START
- */
 bot.start((ctx) => {
-    ctx.replyWithHTML(
-        `<b>Salom ${ctx.from.first_name}!</b>\n\n` +
-        `🎙 Matnni real ovozga aylantiraman\n\n` +
-        `👨‍💻 ${CREATOR}`,
-        Markup.inlineKeyboard([
-            [Markup.button.url("📢 Kanal", `https://t.me/${CHANNEL_ID.replace('@','')}`)]
-        ])
-    );
+    ctx.replyWithHTML(`<b>Salom, ${ctx.from.first_name}!</b>\nMatn yuboring, men uni realistik ovozga aylantiraman.\n\n👨‍💻 @HTML5_5`);
 });
 
-/**
- * MATN QABUL
- */
 bot.on('text', checkSub, async (ctx) => {
-    const text = ctx.message.text;
-
-    if (text.startsWith('/')) return;
-
-    if (text.length > 1500) {
-        return ctx.reply("⚠️ 1500 belgidan oshmasin");
-    }
-
-    const userId = ctx.from.id;
-    userContext.set(userId, text);
-
-    // AUTO DELETE MEMORY (5 min)
-    setTimeout(() => userContext.delete(userId), 5 * 60 * 1000);
-
-    await ctx.reply(
-        "🎧 Ovoz tanlang:",
+    if (ctx.message.text.startsWith('/')) return;
+    
+    userContext.set(ctx.from.id, ctx.message.text);
+    await ctx.replyWithHTML("<b>Ovoz turini tanlang:</b>", 
         Markup.inlineKeyboard([
-            [
-                Markup.button.callback("👨 Erkak", "voice_male"),
-                Markup.button.callback("👩 Ayol", "voice_female")
-            ]
+            [Markup.button.callback("👨 Sardor (Erkak)", "m"), Markup.button.callback("👩 Madina (Ayol)", "f")]
         ])
     );
 });
 
-/**
- * OVOZ GENERATSIYA
- */
-bot.action(/voice_(male|female)/, async (ctx) => {
-    const userId = ctx.from.id;
-    const text = userContext.get(userId);
+bot.action(['m', 'f'], async (ctx) => {
+    const text = userContext.get(ctx.from.id);
+    if (!text) return ctx.answerCbQuery("Matn topilmadi!");
 
-    if (!text) {
-        return ctx.answerCbQuery("Matn topilmadi", { show_alert: true });
-    }
+    const voice = ctx.callbackQuery.data === 'm' ? 'uz-UZ-SardorNeural' : 'uz-UZ-MadinaNeural';
+    await ctx.answerCbQuery("🎙 Tayyorlanmoqda...");
+    await ctx.editMessageText("⏳ Ovoz yozilmoqda...");
 
-    const gender = ctx.match[1];
-    const voice = gender === 'male'
-        ? 'uz-UZ-SardorNeural'
-        : 'uz-UZ-MadinaNeural';
-
-    const name = gender === 'male' ? 'Sardor' : 'Madina';
-
-    await ctx.answerCbQuery("⏳ Tayyorlanmoqda...");
-    await ctx.editMessageText(`⌛ ${name} ovoz...`, { parse_mode: 'HTML' });
-
-    const filePath = `/tmp/${Date.now()}.mp3`;
+    const tempFile = path.join('/tmp', `tts_${ctx.from.id}.mp3`);
 
     try {
-        // TO‘G‘RILANGAN EDGE-TTS
-        await tts.toFile(filePath, text, voice);
-
-        await ctx.replyWithVoice({
-            source: filePath
-        }, {
-            caption: `🎙 ${name} ovozi\n👨‍💻 ${CREATOR}`
-        });
-
-        userContext.delete(userId);
-
+        await tts.setMetadata(voice, 'output_format');
+        await tts.toFile(tempFile, text);
+        await ctx.sendVoice({ source: tempFile });
+        await ctx.deleteMessage();
     } catch (err) {
-        console.error(err);
-        ctx.reply("❌ Xatolik yuz berdi");
+        ctx.reply("❌ Xatolik yuz berdi.");
     } finally {
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-        }
+        if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+        userContext.delete(ctx.from.id);
     }
 });
 
-/**
- * VERIFY BUTTON
- */
-bot.action('verify_sub', async (ctx) => {
-    await ctx.answerCbQuery("Tekshirildi!");
-    await ctx.deleteMessage();
-});
+bot.action('verify', (ctx) => ctx.answerCbQuery("Endi matn yuboring!"));
 
-/**
- * VERCEL HANDLER
- */
 module.exports = async (req, res) => {
     if (req.method === 'POST') {
-        try {
-            await bot.handleUpdate(req.body);
-            res.status(200).send('OK');
-        } catch (e) {
-            console.error(e);
-            res.status(500).send('Error');
-        }
+        await bot.handleUpdate(req.body);
+        res.status(200).send('OK');
     } else {
-        res.status(200).send('Bot ishlayapti 🚀');
+        res.status(200).send('Bot Active');
     }
 };
+                 
